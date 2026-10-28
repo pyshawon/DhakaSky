@@ -128,7 +128,7 @@ Dhaka Sky makes one kind of network request: weather and air quality for Dhaka f
 ## Credits
 
 - Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
-- Made with love for Dhaka, and for my twin boys (2 years and 8 months), who asked for dinosaurs on Baba's laptop. Dinosaur World is theirs.
+- Made with love for Dhaka.
 
 ## License
 
