@@ -70,7 +70,19 @@ Pick a view from the menu bar or Settings, or let it rotate daily.
 
 ## Install
 
-You need macOS 14 Sonoma or later and the Xcode Command Line Tools (`xcode-select --install`).
+### Download (no compiling)
+
+1. Get **DhakaSky-2.0.dmg** from the [latest release](https://github.com/PYSHAWON/DhakaSky/releases/latest). It runs on Apple silicon and Intel Macs with macOS 14 Sonoma or later.
+2. Open the DMG and drag **Dhaka Sky** into **Applications**.
+3. Open the app. Apple hasn't notarized it (it's a free open-source project), so the first time macOS will say it can't verify it. Click **Done**, then open **System Settings > Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once.
+
+   Or run this in Terminal: `xattr -dr com.apple.quarantine "/Applications/Dhaka Sky.app"`
+
+The weather icon appears in the menu bar, and the screen saver for the animated lock screen installs itself.
+
+### Build from source
+
+You need the Xcode Command Line Tools (`xcode-select --install`).
 
 ```sh
 git clone https://github.com/PYSHAWON/DhakaSky.git
@@ -79,7 +91,7 @@ cd DhakaSky
 open ~/Applications/Dhaka\ Sky.app
 ```
 
-`build-app.sh` builds a release copy, installs **Dhaka Sky.app** into `~/Applications`, and installs the screen saver into `~/Library/Screen Savers`. The app is ad-hoc signed, so if macOS blocks the first launch, right-click the app and choose **Open**.
+`build-app.sh` builds a universal release copy and installs **Dhaka Sky.app** into `~/Applications`. To publish a new download, run `./release.sh <version>` (needs the GitHub CLI).
 
 ## Using it
 

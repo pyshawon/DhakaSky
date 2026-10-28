@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds "Dhaka Sky.saver" (the same scene as a screen saver, which macOS can show over the lock screen)
-# and installs it into ~/Library/Screen Savers.
+# and installs it into ~/Library/Screen Savers (unless --no-install is given).
 set -euo pipefail
 cd "$(dirname "$0")"
 SRC=Sources/DhakaSky
@@ -33,13 +33,14 @@ cat > "$SAVER/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>Dhaka Sky</string>
   <key>CFBundleExecutable</key><string>DhakaSky</string>
   <key>CFBundlePackageType</key><string>BNDL</string>
-  <key>CFBundleShortVersionString</key><string>2.0</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION:-2.0}</string>
   <key>CFBundleVersion</key><string>2</string>
   <key>NSPrincipalClass</key><string>DhakaSkySaverView</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 PLIST
 codesign --force -s - "$SAVER"
+[[ "${1:-}" == "--no-install" ]] && { echo "Built: $SAVER"; exit 0; }
 mkdir -p "$HOME/Library/Screen Savers"
 rm -rf "$HOME/Library/Screen Savers/Dhaka Sky.saver"
 cp -R "$SAVER" "$HOME/Library/Screen Savers/"

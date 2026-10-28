@@ -79,6 +79,32 @@ enum LockScreen {
 enum SaverSync {
     static let saverURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Screen Savers/Dhaka Sky.saver")
     static var installed: Bool { FileManager.default.fileExists(atPath: saverURL.path) }
+
+    /// The app carries a copy of the saver (Contents/Resources/Dhaka Sky.saver), so a downloaded app works on its own.
+    /// Install it, or replace an installed copy from a different build.
+    static func installBundled() {
+        guard let bundled = Bundle.main.url(forResource: "Dhaka Sky", withExtension: "saver") else { return }
+        let fm = FileManager.default
+        func version(_ url: URL) -> String? { Bundle(url: url)?.infoDictionary?["CFBundleVersion"] as? String }
+        func binaryDate(_ url: URL) -> Date? {
+            (try? fm.attributesOfItem(atPath: url.appendingPathComponent("Contents/MacOS/DhakaSky").path))?[.modificationDate] as? Date
+        }
+        if installed, version(saverURL) == version(bundled), binaryDate(saverURL) == binaryDate(bundled) { return }
+        do {
+            try fm.createDirectory(at: saverURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if installed { try fm.removeItem(at: saverURL) }
+            try fm.copyItem(at: bundled, to: saverURL)
+            // A downloaded app's files carry the quarantine flag, which would stop the screen saver host loading this copy.
+            let xattr = Process()
+            xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+            xattr.arguments = ["-dr", "com.apple.quarantine", saverURL.path]
+            try? xattr.run()
+            xattr.waitUntilExit()
+            log("installed the screen saver from the app bundle")
+        } catch {
+            log("couldn't install the screen saver: \(error.localizedDescription)")
+        }
+    }
     private static let sandboxDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Containers/com.apple.ScreenSaver.Engine.legacyScreenSaver/Data/Library/Application Support/DhakaSky", isDirectory: true)
     private static let keys = ["view", "landmark", "weatherOverride", "timeOverride", "showTraffic", "showPeople", "showBoats",
