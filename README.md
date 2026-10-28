@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/lakeside.gif" width="800" alt="Lakeside skyline at dusk in the rain, with the Parliament building lit up across the lake">
+  <img src="docs/media/hero.gif" width="800" alt="Dinosaur World on a bright sunny morning: dinosaurs walking, a Pteranodon flying and a smoking volcano">
 </p>
 
 ## What is it?
@@ -57,7 +57,7 @@ Pick a view from the menu bar or Settings, or let it rotate daily.
 | <img src="docs/media/hatirjheel.gif" width="400" alt="Hatirjheel from above at night"><br>**Hatirjheel from above**<br>Aerial view down the canal at night | <img src="docs/media/gulshan.gif" width="400" alt="Gulshan Lake bridge in the morning"><br>**Gulshan Lake bridge**<br>Traffic over the arch bridge and the lakeside road |
 | <img src="docs/media/dhanmondi.gif" width="400" alt="Dhanmondi Lake in drizzle"><br>**Dhanmondi Lake**<br>Promenade, footbridge and rowing boats | <img src="docs/media/lalbagh.gif" width="400" alt="Lalbagh Fort gardens at sunset"><br>**Lalbagh Fort gardens**<br>Pari Bibi's tomb, fountains and topiary |
 | <img src="docs/media/panorama.gif" width="400" alt="City panorama in the afternoon"><br>**City panorama**<br>Rooftops and greenery to the horizon | <img src="docs/media/cefalo.gif" width="400" alt="Cefalo rooftop at noon"><br>**Cefalo rooftop**<br>A green wall and deck above the city |
-| <img src="docs/media/dinos.gif" width="400" alt="Dinosaur World with walking dinosaurs and a smoking volcano"><br>**Dinosaur World**<br>12 friendly species, Pteranodons and a smoking volcano, made for little ones | <img src="docs/media/lakeside.gif" width="400" alt="Lakeside skyline"><br>**Lakeside skyline**<br>Choose the landmark across the lake |
+| <img src="docs/media/dinos.gif" width="400" alt="Dinosaur World with walking dinosaurs and a smoking volcano"><br>**Dinosaur World**<br>12 friendly species, Pteranodons and a smoking volcano, made for little ones | <img src="docs/media/lakeside.gif" width="400" alt="Lakeside skyline on a sunny afternoon, with the Parliament building across the lake"><br>**Lakeside skyline**<br>Choose the landmark across the lake |
 
 **Landmarks for the lakeside view:** Jatiya Sangsad Bhaban (Parliament), Central Shaheed Minar, Ahsan Manzil, Sat Gambuj Mosque, Hatirjheel, Lalbagh Fort and Padma Bridge. You can also use **your own image**: Dhaka Sky cuts the subject out automatically with Apple's Vision framework.
 
