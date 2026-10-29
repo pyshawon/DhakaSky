@@ -5,6 +5,7 @@ import SpriteKit
 struct LayerArt {
     var base: SKTexture
     var lights: SKTexture
+    var lightsImage: CGImage?        // kept only until the glow is made from it (see CityScene.addBloom)
     var size: CGSize
     var beacons: [CGPoint] = []      // red aviation lights, layer-local points
     var greenLights: [CGPoint] = []  // mosque minaret lights
@@ -60,7 +61,9 @@ enum ArtCity {
         }
         crane(ctx, x: W * rng.cg(0.18, 0.3), h: H * 1.05, art: &art)
         art.base = Painter.texture(ctx.makeImage()!)
-        art.lights = Painter.texture(lit.makeImage()!)
+        let litImage = lit.makeImage()!
+        art.lights = Painter.texture(litImage)
+        art.lightsImage = litImage
         return art
     }
 
@@ -124,7 +127,9 @@ enum ArtCity {
             lx += 22
         }
         art.base = Painter.texture(ctx.makeImage()!)
-        art.lights = Painter.texture(lit.makeImage()!)
+        let litImage = lit.makeImage()!
+        art.lights = Painter.texture(litImage)
+        art.lightsImage = litImage
         return art
     }
 

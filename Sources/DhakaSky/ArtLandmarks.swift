@@ -674,6 +674,6 @@ enum ArtLandmarks {
               let buf = try? obs.generateMaskedImage(ofInstances: obs.allInstances, from: handler, croppedToInstancesExtent: true)
         else { return nil }
         let ci = CIImage(cvPixelBuffer: buf)
-        return Painter.ciContext.createCGImage(ci, from: ci.extent)
+        return CIContext().createCGImage(ci, from: ci.extent)  // only when importing a photo; freed afterwards
     }
 }

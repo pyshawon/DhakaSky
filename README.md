@@ -72,7 +72,7 @@ Pick a view from the menu bar or Settings, or let it rotate daily.
 
 ### Download (no compiling)
 
-1. Get **DhakaSky-2.1.dmg** from the [latest release](https://github.com/PYSHAWON/DhakaSky/releases/latest). It runs on Apple silicon and Intel Macs with macOS 14 Sonoma or later.
+1. Get **DhakaSky-2.2.dmg** from the [latest release](https://github.com/PYSHAWON/DhakaSky/releases/latest). It runs on Apple silicon and Intel Macs with macOS 14 Sonoma or later.
 2. Open the DMG and drag **Dhaka Sky** into **Applications**.
 3. Open the app. Apple hasn't notarized it (it's a free open-source project), so the first time macOS will say it can't verify it. Click **Done**, then open **System Settings > Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once.
 

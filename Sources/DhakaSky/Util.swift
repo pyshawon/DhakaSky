@@ -1,5 +1,5 @@
 import AppKit
-import CoreImage
+import Accelerate
 import SpriteKit
 
 // MARK: - Math
@@ -63,7 +63,8 @@ struct SeededRNG: RandomNumberGenerator {
 enum Painter {
     /// Backing scale used for generated art (2 on Retina).
     static var scale: CGFloat = 2
-    static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    /// A 1x1 transparent image, for letting go of a large one.
+    static let emptyImage: CGImage = image(CGSize(width: 1, height: 1), scale: 1) { _ in }
     static let space = CGColorSpace(name: CGColorSpace.sRGB)!
 
     static func image(_ size: CGSize, scale s: CGFloat = Painter.scale, _ draw: (CGContext) -> Void) -> CGImage {
@@ -99,13 +100,55 @@ enum Painter {
     }
 
     static func blurred(_ img: CGImage, radius: CGFloat) -> CGImage {
-        let input = CIImage(cgImage: img)
-        let f = CIFilter(name: "CIGaussianBlur")!
-        f.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
-        f.setValue(radius, forKey: kCIInputRadiusKey)
-        guard let out = f.outputImage?.cropped(to: input.extent),
-              let cg = ciContext.createCGImage(out, from: input.extent) else { return img }
-        return cg
+        // Three box blurs approximate a Gaussian. vImage runs on the CPU and frees its buffers when done
+        // (Core Image keeps well over 100 MB of GPU working memory alive for the rest of the app's life).
+        guard radius >= 1,
+              let format = vImage_CGImageFormat(bitsPerComponent: 8, bitsPerPixel: 32, colorSpace: space,
+                                                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)),
+              var a = try? vImage_Buffer(cgImage: img, format: format) else { return img }
+        defer { a.free() }
+        guard var b = try? vImage_Buffer(width: Int(a.width), height: Int(a.height), bitsPerPixel: 32) else { return img }
+        defer { b.free() }
+        let k = UInt32(max(3, Int((radius * 2).rounded())) | 1)
+        for pass in 0..<3 {
+            if pass % 2 == 0 {
+                vImageBoxConvolve_ARGB8888(&a, &b, nil, 0, 0, k, k, nil, vImage_Flags(kvImageEdgeExtend))
+            } else {
+                vImageBoxConvolve_ARGB8888(&b, &a, nil, 0, 0, k, k, nil, vImage_Flags(kvImageEdgeExtend))
+            }
+        }
+        return (try? b.createCGImage(format: format)) ?? img  // three passes end in b
+    }
+
+    /// Cuts an image down to the box around its non-transparent pixels. Night lights and overlays are mostly empty,
+    /// and SpriteKit keeps a CPU and a GPU copy of every texture, so this saves tens of MB per layer.
+    /// Returns the cropped texture and where it sits, in points (origin bottom-left), or nil if the image is empty.
+    static func trimmed(_ img: CGImage, pointSize: CGSize) -> (texture: SKTexture, frame: CGRect)? {
+        let w = img.width, h = img.height
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = ctx.data else { return nil }
+        ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let px = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+        var minX = w, maxX = -1, minRow = h, maxRow = -1  // rows counted from the top of the buffer
+        for row in 0..<h {
+            let base = row * w * 4
+            var x = 0
+            while x < w {
+                if px[base + x * 4 + 3] > 2 {
+                    minX = min(minX, x); maxX = max(maxX, x); minRow = min(minRow, row); maxRow = max(maxRow, row)
+                }
+                x += 1
+            }
+        }
+        guard maxX >= 0 else { return nil }
+        let pad = 2
+        minX = max(0, minX - pad); maxX = min(w - 1, maxX + pad); minRow = max(0, minRow - pad); maxRow = min(h - 1, maxRow + pad)
+        let crop = CGRect(x: minX, y: minRow, width: maxX - minX + 1, height: maxRow - minRow + 1)
+        guard let full = ctx.makeImage(), let cut = full.cropping(to: crop) else { return nil }
+        let sx = pointSize.width / CGFloat(w), sy = pointSize.height / CGFloat(h)
+        let frame = CGRect(x: crop.minX * sx, y: CGFloat(h - 1 - maxRow) * sy, width: crop.width * sx, height: crop.height * sy)
+        return (texture(cut), frame)
     }
 
     /// A soft halo for a night-lights layer, drawn additively over it so windows and lamps glow.

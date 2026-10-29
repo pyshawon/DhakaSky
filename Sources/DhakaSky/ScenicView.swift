@@ -4,7 +4,7 @@ import SpriteKit
 /// Shares the sky, weather and lighting of `CityScene`; owns its ground art and everything that moves on it.
 final class ScenicView: SKNode {
     let kind: ViewKind
-    let art: ViewArt
+    private(set) var art: ViewArt
     var horizon: CGFloat { art.cam.horizon }
     /// Where the sky has to reach down to (the drawn ground stops here).
     var skyBottom: CGFloat { min(horizon, art.groundTop) }
@@ -54,7 +54,10 @@ final class ScenicView: SKNode {
         default: art = ArtViews.panorama(W: W, H: H, seed: seed)
         }
         ground = SKSpriteNode(texture: Painter.texture(art.base), size: size)
-        lights = SKSpriteNode(texture: Painter.texture(art.lights), size: size)
+        // Only the lit part of the night layer is kept (anchor and position are set to match in build()).
+        let lit = Painter.trimmed(art.lights, pointSize: size)
+        lights = SKSpriteNode(texture: lit?.texture, size: lit?.frame.size ?? .zero)
+        lights.position = lit?.frame.origin ?? .zero
         bloom = SKSpriteNode(texture: Painter.bloom(art.lights, radius: H * 0.006), size: size)
         let farArt = ArtCity.farSkyline(width: W, height: H * max(0.01, art.skyline), seed: seed + 3)
         far = SKSpriteNode(texture: farArt.base, size: farArt.size)
@@ -170,8 +173,9 @@ final class ScenicView: SKNode {
         if let f = art.front {
             // Buildings that stand in front of the road, laid over the traffic so cars pass behind them.
             for (img, z, add) in [(f.base, 2.95, false), (f.lights, 2.96, true)] as [(CGImage, CGFloat, Bool)] {
-                let n = SKSpriteNode(texture: Painter.texture(img), size: CGSize(width: W, height: H))
-                n.anchorPoint = .zero; n.zPosition = z; n.colorBlendFactor = 1
+                guard let t = Painter.trimmed(img, pointSize: CGSize(width: W, height: H)) else { continue }
+                let n = SKSpriteNode(texture: t.texture, size: t.frame.size)
+                n.anchorPoint = .zero; n.position = t.frame.origin; n.zPosition = z; n.colorBlendFactor = 1
                 n.name = add ? "frontLights" : "front"
                 if add { n.blendMode = .add; n.color = .white }
                 addChild(n)
@@ -182,6 +186,9 @@ final class ScenicView: SKNode {
             addChild(life)
             dinos = life
         }
+        // The paintings now live on the GPU as textures. Drop the CPU copies: each is tens of MB at Retina size.
+        art.base = Painter.emptyImage; art.lights = Painter.emptyImage; art.front = nil
+        art.dino?.foreground = Painter.emptyImage
     }
 
     // MARK: Look

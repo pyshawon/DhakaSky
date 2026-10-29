@@ -5,7 +5,8 @@ import SpriteKit
 enum ArtSky {
     static func stars(size: CGSize, seed: UInt64) -> SKTexture {
         var rng = SeededRNG(seed: seed)
-        return Painter.texture(size) { ctx in
+        // Drawn at 1x: stars are soft dots anyway, and this layer covers most of the screen (saves ~75% of its memory).
+        return Painter.texture(size, scale: 1) { ctx in
             let count = Int(size.width * size.height / 2600)
             for _ in 0..<count {
                 let x = rng.cg(0, size.width), y = rng.cg(0, size.height)

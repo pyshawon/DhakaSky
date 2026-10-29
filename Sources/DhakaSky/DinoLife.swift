@@ -2,7 +2,7 @@ import SpriteKit
 
 /// Everything that moves in Dinosaur World: walkers in three bands, Pteranodons, a Plesiosaur and the volcano.
 final class DinoLife: SKNode {
-    private let ex: DinoExtras
+    private var ex: DinoExtras
     private let W: CGFloat, H: CGFloat
     private var arts: [Dino: DinoArt] = [:]
     private let ptero: DinoArt, plesioArt: DinoArt
@@ -52,8 +52,11 @@ final class DinoLife: SKNode {
             bands.append(Band(y: b.y, scale: b.scale, dir: i == 1 ? -1 : 1, speed: speeds[i], max: counts[i], z: 2 + CGFloat(i) * 0.3))
         }
 
-        let fg = SKSpriteNode(texture: Painter.texture(ex.foreground), size: size)
-        fg.anchorPoint = .zero; fg.zPosition = 3.5; fg.colorBlendFactor = 1; fg.name = "fg"
+        // Ferns and rocks along the bottom: only the painted strip is kept, not a full-screen texture.
+        let trim = Painter.trimmed(ex.foreground, pointSize: size)
+        self.ex.foreground = Painter.emptyImage  // on the GPU now; drop the CPU copy
+        let fg = SKSpriteNode(texture: trim?.texture, size: trim?.frame.size ?? .zero)
+        fg.anchorPoint = .zero; fg.position = trim?.frame.origin ?? .zero; fg.zPosition = 3.5; fg.colorBlendFactor = 1; fg.name = "fg"
         addChild(fg)
 
         // Plesiosaur in the lake.

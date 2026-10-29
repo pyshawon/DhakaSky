@@ -1,5 +1,10 @@
 A living, illustrated wallpaper of Dhaka for your Mac. Universal app for Apple silicon and Intel, macOS 14 Sonoma or later.
 
+### New in 2.2
+
+- About 30% less memory: views no longer keep the lakeside scene loaded behind them, mostly empty layers (night lights, foreground) are trimmed to their painted area, and painted images are released once they are on the GPU.
+- Less CPU: the scene's colours update 10 times a second instead of every frame. Tip: 30 fps (Comfort & Performance) looks just as smooth and uses about half the drawing work of 60 fps.
+
 ### Fixed in 2.1
 
 - The lock-screen still no longer fills up your disk. Version 2.0 saved a new desktop picture every few minutes, and macOS keeps a large cached copy of every desktop picture it is given. Now there is one still per look (day, golden hour, night, dry or rainy), drawn once in clean conditions and reused, so it costs no extra disk space over time.

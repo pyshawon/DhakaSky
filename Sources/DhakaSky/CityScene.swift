@@ -138,6 +138,7 @@ final class CityScene: SKScene {
     private var sunEl = 30.0, sunAz = 180.0, moonEl = -30.0, moonAz = 180.0, phase = 0.5
     private var moonPhaseDrawn = -1.0
     private var look = Look.interpolateClear(30)
+    private var lookAge = 1.0  // seconds since the colours were last applied
     private var lastUpdate: TimeInterval = 0
     private var time: Double = 0
     private var landmarkID = ""
@@ -238,9 +239,11 @@ final class CityScene: SKScene {
     }
 
     /// Adds a soft additive glow as a child of a night-lights sprite, so it fades in and out with it.
-    private func addBloom(to lights: SKSpriteNode, radius: CGFloat) {
-        guard let tex = lights.texture else { return }
-        let b = SKSpriteNode(texture: Painter.bloom(tex.cgImage(), radius: radius), size: lights.size)
+    /// Pass the lights' source image when there is one: asking a texture for its image makes SpriteKit keep a
+    /// full-size copy inside it.
+    private func addBloom(to lights: SKSpriteNode, image: CGImage? = nil, radius: CGFloat) {
+        guard let img = image ?? lights.texture?.cgImage() else { return }
+        let b = SKSpriteNode(texture: Painter.bloom(img, radius: radius), size: lights.size)
         b.anchorPoint = lights.anchorPoint; b.zPosition = 0.01; b.blendMode = .add; b.alpha = 0.8
         lights.addChild(b)
     }
@@ -277,7 +280,7 @@ final class CityScene: SKScene {
         let farArt = ArtCity.farSkyline(width: W, height: H * 0.2, seed: seed + 11)
         far = sprite(farArt.base, farArt.size, z: 6, at: P(0, yShore + H * 0.012))
         farLights = sprite(farArt.lights, farArt.size, z: 6.1, at: far.position); farLights.blendMode = .add
-        addBloom(to: farLights, radius: H * 0.005)
+        addBloom(to: farLights, image: farArt.lightsImage, radius: H * 0.005)
         for b in farArt.beacons {
             let g = sprite(glowTex, CGSize(width: 9, height: 9), z: 6.2, anchor: P(0.5, 0.5), at: P(b.x, far.position.y + b.y))
             g.blendMode = .add; g.color = RGB(0xFF3B30).sk
@@ -462,10 +465,17 @@ final class CityScene: SKScene {
     func applySettings() {
         Painter.scale = pixelScale
         let s = Settings.shared
-        let id = s.effectiveLandmark
-        if id != landmarkID { setLandmark(id) }
         if s.effectiveView != viewID { setView(s.effectiveView) }
-        updateTrees(show: s.showTrees)
+        // The landmark, near skyline and trees only appear in the lakeside view. Behind any other view (or a photo)
+        // they are let go instead of kept hidden, and drawn again on the way back.
+        if scenic == nil && s.effectivePhoto == nil {
+            let id = s.effectiveLandmark
+            if id != landmarkID { setLandmark(id) }
+            updateTrees(show: s.showTrees)
+        } else {
+            if !landmarkID.isEmpty { clearLandmark(); landmarkID = "" }
+            updateTrees(show: false)
+        }
         if !s.showTraffic { vehicles.forEach { $0.root.removeFromParent() }; vehicles.removeAll() }
         if !s.showPeople { walkers.forEach { $0.node.removeFromParent() }; walkers.removeAll() }
         if !s.showBoats { boats.forEach { $0.root.removeFromParent() }; boats.removeAll() }
@@ -474,13 +484,18 @@ final class CityScene: SKScene {
         grain.isHidden = !s.showGrain
     }
 
-    private func setLandmark(_ id: String) {
-        landmarkID = id
+    private func clearLandmark() {
         landmark?.removeFromParent(); landmarkLights?.removeFromParent()
         landmark = nil; landmarkLights = nil
         for (r, _) in landmarkReflections + nearReflections { r.node.removeFromParent() }
         landmarkReflections.removeAll(); nearReflections.removeAll()
         near.removeFromParent(); nearLights.removeFromParent()
+        near = SKSpriteNode(); nearLights = SKSpriteNode()
+    }
+
+    private func setLandmark(_ id: String) {
+        landmarkID = id
+        clearLandmark()
 
         let art = ArtLandmarks.make(id, height: H * 0.25, screenWidth: W)
         let wide = id == Landmark.hatirjheel.rawValue || id == Landmark.padma.rawValue
@@ -504,7 +519,7 @@ final class CityScene: SKScene {
         let nearArt = ArtCity.nearSkyline(width: W, height: H * 0.13, gap: gap, seed: seed + 23)
         near = sprite(nearArt.base, nearArt.size, z: 9, at: P(0, yShore - H * 0.006))
         nearLights = sprite(nearArt.lights, nearArt.size, z: 9.1, at: near.position); nearLights.blendMode = .add
-        addBloom(to: nearLights, radius: H * 0.006)
+        addBloom(to: nearLights, image: nearArt.lightsImage, radius: H * 0.006)
         addReflection(nearArt.base, nearArt.size, x: W / 2, kind: 1, list: &nearReflections)
         addReflection(nearArt.lights, nearArt.size, x: W / 2, kind: 3, list: &nearReflections)
     }
@@ -630,8 +645,14 @@ final class CityScene: SKScene {
         weather.approach(weatherTarget, 1 - exp(-dt / 5))
         wet += (weather.rain - wet) * (weather.rain > wet ? 1 - exp(-dt / 8) : 1 - exp(-dt / 900))
 
-        look = Look.compute(sun: sunEl, moon: moonEl, phase: phase, w: weather)
-        applyLook(dt)
+        // Light and colour change over minutes, so recolouring every node runs 10 times a second, not every frame.
+        lookAge += dt
+        if lookAge >= 0.1 {
+            look = Look.compute(sun: sunEl, moon: moonEl, phase: phase, w: weather)
+            applyLook(lookAge)
+            lookAge = 0
+        }
+        animateLights(dt)
         updateClouds(dt)
         updateRain()
         if let sv = scenic {
@@ -652,6 +673,19 @@ final class CityScene: SKScene {
         let dim = Settings.shared.dim + look.night * 0.06
         dimmer.alpha = CGFloat(dim)
         dimmer.isHidden = dim < 0.005
+    }
+
+    /// The parts of the look that move smoothly: blinking aviation beacons and drifting fog.
+    private func animateLights(_ dt: Double) {
+        let lit = CGFloat(look.night)
+        for (b, ph) in beacons {
+            let pulse = pow(max(0, sin(time * 1.6 + ph)), 6)
+            b.alpha = lit * CGFloat(0.25 + 0.75 * pulse)
+        }
+        for (i, f) in fogBands.enumerated() where !f.isHidden {
+            f.position.x += CGFloat(dt) * (6 + CGFloat(i) * 3) * (weather.wind < 0 ? -1 : 1)
+            if f.position.x > W * 1.3 { f.position.x = -W * 0.3 } else if f.position.x < -W * 0.3 { f.position.x = W * 1.3 }
+        }
     }
 
     private func applyLook(_ dt: Double) {
@@ -683,10 +717,6 @@ final class CityScene: SKScene {
         farLights.alpha = lit * 0.85 * CGFloat(1 - weather.fog * 0.6) * (riverView ? 0.35 : 1)
         nearLights.alpha = lit
         landmarkLights?.alpha = lit
-        for (b, ph) in beacons {
-            let pulse = pow(max(0, sin(time * 1.6 + ph)), 6)
-            b.alpha = lit * CGFloat(0.25 + 0.75 * pulse)
-        }
         for g in greenLights { g.alpha = lit * 0.8 }
         hazeA.color = L.hor.sk; hazeA.alpha = CGFloat(min(0.85, L.hazeAlpha))
         hazeB.color = L.hor.sk; hazeB.alpha = CGFloat(min(0.6, L.hazeAlpha * 0.45))
@@ -717,11 +747,9 @@ final class CityScene: SKScene {
         for (n, a) in lampGlows { n.alpha = lit * a * CGFloat(fogBloom) }
         for s in lampWet { s.alpha = lit * CGFloat(wet) * 0.6; s.isHidden = s.alpha < 0.01 }
 
-        for (i, f) in fogBands.enumerated() {
+        for f in fogBands {
             f.alpha = CGFloat(L.fogAlpha * 0.75 + weather.haze * 0.12)
             f.color = L.hor.lighter(0.15).sk
-            f.position.x += CGFloat(dt) * (6 + CGFloat(i) * 3) * (weather.wind < 0 ? -1 : 1)
-            if f.position.x > W * 1.3 { f.position.x = -W * 0.3 } else if f.position.x < -W * 0.3 { f.position.x = W * 1.3 }
             f.isHidden = f.alpha < 0.01
         }
         backdrop?.color = RGB.mix(.white, L.ambient, 0.85).sk
