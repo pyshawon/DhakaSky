@@ -106,8 +106,6 @@ final class Settings {
     var lockScreen: Bool { get { get("lockScreen", true) } set { set("lockScreen", newValue) } }
     /// Start the Dhaka Sky screen saver as soon as the screen locks, so the lock screen is animated.
     var lockAnimation: Bool { get { get("lockAnimation", true) } set { set("lockAnimation", newValue) } }
-    /// How often the lock-screen still is refreshed, in minutes.
-    var lockRefresh: Int { get { get("lockRefresh", 5) } set { set("lockRefresh", newValue) } }
     /// "live" or a `Condition` raw value.
     var weatherOverride: String { get { get("weatherOverride", "live") } set { set("weatherOverride", newValue) } }
     var timeOverride: TimeOverride {
@@ -157,6 +155,25 @@ final class Settings {
         cal.timeZone = Solar.dhaka
         let day = cal.ordinality(of: .day, in: .era, for: Date()) ?? 0
         return Landmark.rotating[day % Landmark.rotating.count].rawValue
+    }
+
+    /// Everything that changes how the scene looks, apart from the time and the weather. A lock-screen still is
+    /// reused for as long as this stays the same. Built from the typed settings, so an unset default and the same
+    /// value set explicitly match. Custom images include their file date, so re-importing under the same name counts.
+    var pictureSignature: String {
+        func stamped(_ choice: String) -> String {
+            guard choice.hasPrefix("custom:") else { return choice }
+            let url = Self.customDir.appendingPathComponent(String(choice.dropFirst("custom:".count)))
+            let date = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+            return "\(choice)@\(Int(date?.timeIntervalSince1970 ?? 0))"
+        }
+        let choice = effectiveChoice
+        let usesLandmark = ViewKind(rawValue: choice).map { $0 == .lakeside } ?? true
+        let month = Solar.month(Date())
+        let season = [4, 5, 6].contains(month) ? "bloom" : [3, 7].contains(month) ? "some" : "plain"
+        let parts: [Any] = [stamped(choice), usesLandmark ? stamped(effectiveLandmark) : "-", showTraffic, showPeople, showBoats,
+                            showBirds, showPlanes, showTrees, showGrain, Int(dim * 100), showTrees ? season : "-"]
+        return parts.map { "\($0)" }.joined(separator: "|")
     }
 
     static var customDir: URL {

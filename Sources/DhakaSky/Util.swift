@@ -108,6 +108,18 @@ enum Painter {
         return cg
     }
 
+    /// A soft halo for a night-lights layer, drawn additively over it so windows and lamps glow.
+    /// Made at a quarter of the size (the blur hides it), so it costs about 1/16 of the layer's memory.
+    static func bloom(_ img: CGImage, radius: CGFloat) -> SKTexture {
+        let w = max(1, img.width / 4), h = max(1, img.height / 4)
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return SKTexture() }
+        ctx.interpolationQuality = .medium
+        ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let small = ctx.makeImage() else { return SKTexture() }
+        return texture(blurred(small, radius: radius * scale / 4))
+    }
+
     /// Soft radial glow (white centre fading to transparent).
     static func glow(_ d: CGFloat, falloff: CGFloat = 1.6) -> SKTexture {
         let px = Int(d * scale)

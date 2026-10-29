@@ -14,7 +14,7 @@ final class ScenicView: SKNode {
     private let wFar = SKUniform(name: "u_far", vectorFloat4: .zero), wNear = SKUniform(name: "u_near", vectorFloat4: .zero)
     private let wGlow = SKUniform(name: "u_glow", vectorFloat4: .zero), wSun = SKUniform(name: "u_sun", vectorFloat2: .zero)
     private let wMoon = SKUniform(name: "u_moon", vectorFloat2: .zero), wRough = SKUniform(name: "u_rough", float: 0)
-    private let ground: SKSpriteNode, lights: SKSpriteNode
+    private let ground: SKSpriteNode, lights: SKSpriteNode, bloom: SKSpriteNode
     private let far: SKSpriteNode, farLights: SKSpriteNode
     private let haze = SKSpriteNode()
     private let ripples = SKEmitterNode()
@@ -55,6 +55,7 @@ final class ScenicView: SKNode {
         }
         ground = SKSpriteNode(texture: Painter.texture(art.base), size: size)
         lights = SKSpriteNode(texture: Painter.texture(art.lights), size: size)
+        bloom = SKSpriteNode(texture: Painter.bloom(art.lights, radius: H * 0.006), size: size)
         let farArt = ArtCity.farSkyline(width: W, height: H * max(0.01, art.skyline), seed: seed + 3)
         far = SKSpriteNode(texture: farArt.base, size: farArt.size)
         farLights = SKSpriteNode(texture: farArt.lights, size: farArt.size)
@@ -86,6 +87,8 @@ final class ScenicView: SKNode {
             addChild(n)
         }
         lights.blendMode = .add
+        bloom.anchorPoint = .zero; bloom.zPosition = 1.12; bloom.blendMode = .add
+        addChild(bloom)
         lights.color = .white; farLights.color = .white  // texture sprites default to a clear tint
         // Haze peaks at the far ground line and fades both down over the city and up over the tallest towers.
         let below = H * art.hazeDepth, above = H * 0.07
@@ -193,6 +196,7 @@ final class ScenicView: SKNode {
         if let fl = childNode(withName: "frontLights") as? SKSpriteNode { fl.alpha = CGFloat(L.night); fl.isHidden = L.night < 0.01 }
         dinos?.applyLook(ambient: L.ambient, night: L.night, haze: L.hor, wind: weather.wind)
         lights.alpha = CGFloat(L.night); lights.isHidden = L.night < 0.01
+        bloom.alpha = CGFloat(L.night * 0.8); bloom.isHidden = L.night < 0.01
         far.color = L.far.sk
         farLights.alpha = CGFloat(L.night * 0.8)
         haze.color = L.hor.sk

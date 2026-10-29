@@ -237,6 +237,14 @@ final class CityScene: SKScene {
         return s
     }
 
+    /// Adds a soft additive glow as a child of a night-lights sprite, so it fades in and out with it.
+    private func addBloom(to lights: SKSpriteNode, radius: CGFloat) {
+        guard let tex = lights.texture else { return }
+        let b = SKSpriteNode(texture: Painter.bloom(tex.cgImage(), radius: radius), size: lights.size)
+        b.anchorPoint = lights.anchorPoint; b.zPosition = 0.01; b.blendMode = .add; b.alpha = 0.8
+        lights.addChild(b)
+    }
+
     private func build() {
         addChild(cityRoot)
         let white = Painter.texture(CGSize(width: 2, height: 2), scale: 1) { $0.fillGray(1, 1, R(0, 0, 2, 2)) }
@@ -269,6 +277,7 @@ final class CityScene: SKScene {
         let farArt = ArtCity.farSkyline(width: W, height: H * 0.2, seed: seed + 11)
         far = sprite(farArt.base, farArt.size, z: 6, at: P(0, yShore + H * 0.012))
         farLights = sprite(farArt.lights, farArt.size, z: 6.1, at: far.position); farLights.blendMode = .add
+        addBloom(to: farLights, radius: H * 0.005)
         for b in farArt.beacons {
             let g = sprite(glowTex, CGSize(width: 9, height: 9), z: 6.2, anchor: P(0.5, 0.5), at: P(b.x, far.position.y + b.y))
             g.blendMode = .add; g.color = RGB(0xFF3B30).sk
@@ -485,6 +494,7 @@ final class CityScene: SKScene {
             if let lt = art.lights {
                 landmarkLights = sprite(lt, art.size, z: 8.1, anchor: P(0.5, 0), at: l.position)
                 landmarkLights?.blendMode = .add
+                if let ll = landmarkLights { addBloom(to: ll, radius: H * 0.006) }
             }
             gap = (cx - art.size.width / 2 - W * 0.015)...(cx + art.size.width / 2 + W * 0.015)
             if riverView { gap = (-W)...(W * 2) }  // open river: no near-bank city
@@ -494,6 +504,7 @@ final class CityScene: SKScene {
         let nearArt = ArtCity.nearSkyline(width: W, height: H * 0.13, gap: gap, seed: seed + 23)
         near = sprite(nearArt.base, nearArt.size, z: 9, at: P(0, yShore - H * 0.006))
         nearLights = sprite(nearArt.lights, nearArt.size, z: 9.1, at: near.position); nearLights.blendMode = .add
+        addBloom(to: nearLights, radius: H * 0.006)
         addReflection(nearArt.base, nearArt.size, x: W / 2, kind: 1, list: &nearReflections)
         addReflection(nearArt.lights, nearArt.size, x: W / 2, kind: 3, list: &nearReflections)
     }
@@ -538,6 +549,36 @@ final class CityScene: SKScene {
         computeCelestial(snap: true)
         look = Look.compute(sun: sunEl, moon: moonEl, phase: phase, w: weather)
         applyLook(0)
+    }
+
+    /// Renders a clean still for the lock screen at a chosen time and weather: no lightning, no leftover wet streets,
+    /// the same moment of the day every time. The live state is put back before returning, all within one run-loop pass,
+    /// so the desktop never shows the borrowed moment.
+    func renderStill(in view: SKView, at date: Date, weather w: WeatherParams) -> CGImage? {
+        let saved = (clock, weatherTarget, weather, wet)
+        clock = { date }
+        weatherTarget = w; weather = w; wet = w.rain
+        flash.removeAllActions(); flash.alpha = 0
+        bolt.removeAllActions(); bolt.alpha = 0
+        computeCelestial(snap: true)
+        look = Look.compute(sun: sunEl, moon: moonEl, phase: phase, w: weather)
+        applyFrameLook()  // (a wet still is only taken while it is raining, so the rain is already falling)
+        let image = view.texture(from: self)?.cgImage()
+        (clock, weatherTarget, weather, wet) = saved
+        computeCelestial(snap: true)
+        look = Look.compute(sun: sunEl, moon: moonEl, phase: phase, w: weather)
+        applyFrameLook()
+        return image
+    }
+
+    /// Everything colour-related that `update` does each frame, without moving anything.
+    private func applyFrameLook() {
+        applyLook(0)
+        updateClouds(0)
+        updateRain()
+        let dim = Settings.shared.dim + look.night * 0.06
+        dimmer.alpha = CGFloat(dim)
+        dimmer.isHidden = dim < 0.005
     }
 
     /// Jump straight to the target state (no easing) and fill the scene with traffic and rain.
@@ -615,6 +656,7 @@ final class CityScene: SKScene {
 
     private func applyLook(_ dt: Double) {
         let L = look
+        grain.alpha = CGFloat(1 - 0.6 * L.night)  // paper grain reads as noise on dark skies
         uTop.vectorFloat4Value = L.top.v4(); uMid.vectorFloat4Value = L.mid.v4(); uHor.vectorFloat4Value = L.hor.v4()
         uGlow.vectorFloat4Value = L.glow.v4(L.glowStrength * smoothstep(-8, 0, sunEl))
         uCity.vectorFloat4Value = RGB(0xFF9A5A).v4(L.cityGlow * 0.16)

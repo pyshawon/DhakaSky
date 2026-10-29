@@ -1,12 +1,18 @@
 import AppKit
 import SpriteKit
 
-/// macOS draws the lock screen from the desktop picture, and only the system can animate it.
-/// So while this is on, the current frame of each screen is saved as that screen's desktop picture
-/// (hidden behind the live wallpaper) every few minutes and just before the screen locks or sleeps.
-/// Turning it off puts the user's original pictures back.
+/// macOS draws the lock screen from the desktop picture, so while this is on each screen's desktop picture
+/// (hidden behind the live wallpaper) is a still of Dhaka Sky. Turning it off puts the user's own pictures back.
+///
+/// Every new desktop picture makes macOS keep a full-size uncompressed copy (tens of MB) in its wallpaper cache,
+/// a folder apps can't clean up. So stills are never re-rendered on a timer. There is one fixed file per
+/// look (the settings that change the picture, plus day / golden hour / night and dry / wet), written once and
+/// reused: switching back to a look points at the same, unchanged file, which macOS already has cached.
+/// New cache entries only appear when the user changes how the scene looks, and the files kept here are capped.
 enum LockScreen {
     private static let originalsKey = "lockScreenOriginals"
+    private static let usedKey = "lockScreenStillsUsed"
+    private static let maxStills = 24
     private static var dir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let d = base.appendingPathComponent("DhakaSky/LockScreen", isDirectory: true)
@@ -21,56 +27,104 @@ enum LockScreen {
         (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
     }
 
-    static func update(_ windows: [WallpaperWindow]) {
-        let ws = NSWorkspace.shared
+    /// Show the still for the current look, rendering it only if this look has never been saved.
+    /// `look` is `Settings.pictureSignature`: the settings that change the picture.
+    static func update(_ windows: [WallpaperWindow], look: String) {
+        let ws = NSWorkspace.shared, fm = FileManager.default, folder = dir
         var originals = UserDefaults.standard.dictionary(forKey: originalsKey) as? [String: String] ?? [:]
-        let stamp = Int(Date().timeIntervalSince1970)
+        var used = UserDefaults.standard.dictionary(forKey: usedKey) as? [String: Double] ?? [:]
+        var changed = false
         for w in windows {
             let screen = w.targetScreen, id = displayID(screen)
+            let m = moment(w.cityScene)
+            let size = "\(Int(w.frame.width))x\(Int(w.frame.height))"
+            let name = "lock-\(id)-\(stableHash("\(look)|\(size)|\(m.key)")).jpg"
+            let url = folder.appendingPathComponent(name)
+            let current = ws.desktopImageURL(for: screen)
+            if current?.standardizedFileURL == url.standardizedFileURL, fm.fileExists(atPath: url.path) { continue }  // already showing
             // Remember the user's own picture once, so it can be restored.
-            if originals[id] == nil, let cur = ws.desktopImageURL(for: screen), !cur.path.hasPrefix(dir.path) {
+            if originals[id] == nil, let cur = current, !cur.path.hasPrefix(folder.path) {
                 originals[id] = cur.absoluteString
             }
-            w.cityScene.catchUp()
-            guard let tex = w.skView.texture(from: w.cityScene) else { continue }
-            let rep = NSBitmapImageRep(cgImage: tex.cgImage())
-            guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { continue }
-            // A fresh file name each time: the system caches pictures by URL.
-            let url = dir.appendingPathComponent("lock-\(id)-\(stamp).jpg")
-            do {
-                try data.write(to: url)
-                try ws.setDesktopImageURL(url, for: screen, options: [
-                    .imageScaling: NSImageScaling.scaleProportionallyUpOrDown.rawValue, .allowClipping: true,
-                ])
-            } catch { continue }
-            removeOld(id: id, keep: url)
+            if !fm.fileExists(atPath: url.path) {
+                guard let img = w.cityScene.renderStill(in: w.skView, at: m.date, weather: m.weather),
+                      let data = NSBitmapImageRep(cgImage: img).representation(using: .jpeg, properties: [.compressionFactor: 0.85]),
+                      (try? data.write(to: url)) != nil else { continue }
+            }
+            guard (try? ws.setDesktopImageURL(url, for: screen, options: [
+                .imageScaling: NSImageScaling.scaleProportionallyUpOrDown.rawValue, .allowClipping: true,
+            ])) != nil else { continue }
+            used[name] = Date().timeIntervalSince1970
+            changed = true
         }
+        // Defaults are only written when a picture actually changed (writing them wakes the whole settings chain).
+        guard changed else { return }
+        prune(&used)
         UserDefaults.standard.set(originals, forKey: originalsKey)
+        UserDefaults.standard.set(used, forKey: usedKey)
     }
 
-    /// Put back the pictures the user had before, and forget the saved frames.
-    static func restore() {
+    /// Keep the most recently used stills (about 1 MB each), never one that a screen is showing, and always the
+    /// latest one of every display, so a monitor that is unplugged for a while still has its picture when it returns.
+    private static func prune(_ used: inout [String: Double]) {
+        let fm = FileManager.default
+        let showing = Set(NSScreen.screens.compactMap { NSWorkspace.shared.desktopImageURL(for: $0)?.lastPathComponent })
+        var keep = Set(used.sorted { $0.value > $1.value }.prefix(maxStills).map(\.key)).union(showing)
+        var latest: [String: (String, Double)] = [:]
+        for (name, t) in used {
+            let id = name.split(separator: "-").dropFirst().first.map(String.init) ?? ""
+            if t > latest[id]?.1 ?? 0 { latest[id] = (name, t) }
+        }
+        keep.formUnion(latest.values.map(\.0))
+        used = used.filter { keep.contains($0.key) }
+        for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] where !keep.contains(f.lastPathComponent) {
+            try? fm.removeItem(at: f)
+        }
+    }
+
+    /// The still for a moment depends only on the light (day, golden hour, night) and whether it is raining. Each is
+    /// drawn at a fixed time and in fixed weather, so the saved picture is the same whenever it is first made.
+    private static func moment(_ scene: CityScene) -> (key: String, date: Date, weather: WeatherParams) {
+        let now = scene.clock()
+        let sun = Solar.sun(at: now).elevation
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = Solar.dhaka
+        let start = cal.startOfDay(for: now)
+        let (light, date): (String, Date) =
+            sun > 8 ? ("day", start.addingTimeInterval(11 * 3600)) :
+            sun > -6 ? ("golden", Solar.time(forElevation: 2, morning: false, on: now)) :
+            ("night", start.addingTimeInterval(21.5 * 3600))
+        let w = scene.weatherTarget
+        let wet = w.rain > 0.15 || w.storm > 0.2
+        return ("\(light)-\(wet ? "wet" : "dry")", date, WeatherSnapshot.preset(wet ? .rain : .partlyCloudy).params)
+    }
+
+    /// FNV-1a: stable across launches (Swift's Hasher is not), so the same look always maps to the same file.
+    private static func stableHash(_ s: String) -> String {
+        var h: UInt64 = 0xcbf29ce484222325
+        for b in s.utf8 { h = (h ^ UInt64(b)) &* 0x100000001b3 }
+        return String(h, radix: 16)
+    }
+
+    /// Put back the pictures the user had before.
+    /// `deleteStills` when the feature is turned off: the saved stills go too. On quit they stay, so the next launch
+    /// reuses them (setting an unchanged file again costs nothing).
+    static func restore(deleteStills: Bool = false) {
+        defer {
+            if deleteStills, !hasOriginals {
+                try? FileManager.default.removeItem(at: dir)
+                UserDefaults.standard.removeObject(forKey: usedKey)
+            }
+        }
         guard var originals = UserDefaults.standard.dictionary(forKey: originalsKey) as? [String: String] else { return }
         for screen in NSScreen.screens {
             let id = displayID(screen)
             guard let s = originals[id], let url = URL(string: s), FileManager.default.fileExists(atPath: url.path),
                   (try? NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])) != nil else { continue }
             originals[id] = nil
-            // The screen shows the user's picture again, so its stills can go. Screens that couldn't be restored keep theirs.
-            for f in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-            where f.lastPathComponent.hasPrefix("lock-\(id)-") {
-                try? FileManager.default.removeItem(at: f)
-            }
         }
         if originals.isEmpty { UserDefaults.standard.removeObject(forKey: originalsKey) }
         else { UserDefaults.standard.set(originals, forKey: originalsKey) }
-    }
-
-    private static func removeOld(id: String, keep: URL) {
-        for f in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        where f.lastPathComponent.hasPrefix("lock-\(id)-") && f != keep {
-            try? FileManager.default.removeItem(at: f)
-        }
     }
 }
 

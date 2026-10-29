@@ -273,7 +273,6 @@ private struct DisplayTab: View {
     @AppStorage("showGrain") private var grain = true
     @AppStorage("lockScreen") private var lockScreen = true
     @AppStorage("lockAnimation") private var lockAnimation = true
-    @AppStorage("lockRefresh") private var lockRefresh = 5
     @State private var saverSelected = SaverSync.isSelected
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
@@ -290,11 +289,7 @@ private struct DisplayTab: View {
             }
             Section("Lock screen") {
                 Toggle("Show Dhaka Sky on the lock screen", isOn: $lockScreen)
-                Picker("Refresh the still every", selection: $lockRefresh) {
-                    ForEach([1, 2, 5, 10, 15], id: \.self) { Text("\($0) min").tag($0) }
-                }
-                .disabled(!lockScreen)
-                Text("Shows a still of the current view on the lock screen, refreshed on this schedule and when you lock. This works by setting your desktop picture (hidden behind the live wallpaper). Turning it off restores your original picture.")
+                Text("Shows a still of the current view on the lock screen, with day, golden-hour and night versions. This works by setting your desktop picture (hidden behind the live wallpaper). Each still is saved once and reused, so it doesn't fill up your disk. Turning it off restores your original picture.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Animate the lock screen", isOn: $lockAnimation)
                 HStack {

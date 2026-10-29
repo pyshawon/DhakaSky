@@ -14,7 +14,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let sound = SoundScape()
     private var soundTimer: Timer?
     private var asleep = false
-    private var lockTimer: Timer?
     private var lockSignature = ""
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -67,23 +66,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Start or stop keeping the lock screen (desktop picture) in sync with the live wallpaper.
     private func applyLockScreen() {
         // Only react to changes that alter the picture (saving the still itself writes defaults too).
-        let d = UserDefaults.standard
-        let sig = ["lockScreen", "lockAnimation", "lockRefresh", "showTraffic", "showPeople", "showBoats", "showBirds", "showPlanes", "showGrain", "fps", "view", "landmark", "weatherOverride", "timeOverride", "dim", "showTrees"]
-            .map { "\(d.object(forKey: $0) ?? "-")" }.joined(separator: "|")
+        let sig = [settings.pictureSignature, "\(settings.lockScreen)", "\(settings.lockAnimation)", "\(settings.fps)",
+                   settings.weatherOverride, settings.timeOverride.rawValue].joined(separator: "|")
         guard sig != lockSignature else { return }
         lockSignature = sig
         SaverSync.sync()
         if settings.lockScreen {
-            lockTimer?.invalidate()
-            let every = TimeInterval(max(1, settings.lockRefresh) * 60)
-            lockTimer = Timer.scheduledTimer(withTimeInterval: every, repeats: true) { [weak self] _ in self?.refreshLockScreen() }
             // Let a new view or weather settle in before taking the still.
             NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(refreshLockScreen), object: nil)
             perform(#selector(refreshLockScreen), with: nil, afterDelay: 3)
         } else {
-            lockTimer?.invalidate(); lockTimer = nil
             NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(refreshLockScreen), object: nil)
-            if LockScreen.hasOriginals { LockScreen.restore() }
+            LockScreen.restore(deleteStills: true)
         }
     }
 
@@ -97,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func refreshLockScreen() {
         // No point rendering stills while the displays sleep; sleep() takes one on the way down.
         guard settings.lockScreen, !asleep, !windows.isEmpty else { return }
-        LockScreen.update(windows)
+        LockScreen.update(windows, look: settings.pictureSignature)
     }
 
     // MARK: Windows
@@ -180,6 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windows.forEach { $0.cityScene.applySettings() }  // picks up daily landmark rotation & seasonal blossoms
         pushWeather()
         updateStatusIcon()
+        // Cheap: it only compares file names, and draws or switches a picture when the light, rain or settings change.
+        if !lockSignature.isEmpty { refreshLockScreen() }  // (set once applyLockScreen has run, after launch)
     }
 
     private func applyFrameRate() {
@@ -318,9 +314,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         cm.addItem(.separator())
         cm.addItem(toggle("Show on Lock Screen", settings.lockScreen, "lockScreen"))
         cm.addItem(toggle("Animate Lock Screen (Screen Saver)", settings.lockAnimation, "lockAnimation"))
-        let lr = NSMenu()
-        for m in [1, 2, 5, 10, 15] { lr.addItem(choice("Every \(m) min", settings.lockRefresh == m, #selector(pickLockRefresh(_:)), String(m))) }
-        cm.addItem(submenu("Lock Screen Refresh", lr))
         menu.addItem(submenu("Comfort & Performance", cm))
         menu.addItem(.separator())
 
@@ -346,7 +339,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func refreshWeather() { weather.refresh() }
-    @objc private func pickLockRefresh(_ s: NSMenuItem) { settings.lockRefresh = Int(s.representedObject as! String) ?? 5 }
     @objc private func pickView(_ s: NSMenuItem) { settings.view = s.representedObject as! String }
     @objc private func pickLandmark(_ s: NSMenuItem) { settings.landmark = s.representedObject as! String }
     @objc private func pickWeather(_ s: NSMenuItem) { settings.weatherOverride = s.representedObject as! String }

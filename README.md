@@ -65,14 +65,14 @@ Pick a view from the menu bar or Settings, or let it rotate daily.
 
 ## Lock screen
 
-- **Still picture:** Dhaka Sky keeps a still of the current view as your desktop picture, which macOS shows on the lock screen. It refreshes every 1, 2, 5, 10 or 15 minutes (your choice) and the moment you lock. Turn it off and your original picture comes back.
+- **Still picture:** Dhaka Sky keeps a still of the current view as your desktop picture, which macOS shows on the lock screen. It has day, golden-hour and night versions and switches between them as the light changes. Each still is saved once and reused, so it never fills up your disk. Turn it off and your original picture comes back.
 - **Animation:** macOS only lets a screen saver animate over the lock screen, so the project also builds `Dhaka Sky.saver`. When you lock, the app starts it and the same live scene plays. Settings > Display has a **Use Dhaka Sky as Screen Saver** button, and shows a green tick once it is selected.
 
 ## Install
 
 ### Download (no compiling)
 
-1. Get **DhakaSky-2.0.dmg** from the [latest release](https://github.com/PYSHAWON/DhakaSky/releases/latest). It runs on Apple silicon and Intel Macs with macOS 14 Sonoma or later.
+1. Get **DhakaSky-2.1.dmg** from the [latest release](https://github.com/PYSHAWON/DhakaSky/releases/latest). It runs on Apple silicon and Intel Macs with macOS 14 Sonoma or later.
 2. Open the DMG and drag **Dhaka Sky** into **Applications**.
 3. Open the app. Apple hasn't notarized it (it's a free open-source project), so the first time macOS will say it can't verify it. Click **Done**, then open **System Settings > Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once.
 

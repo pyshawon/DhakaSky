@@ -1,5 +1,10 @@
 A living, illustrated wallpaper of Dhaka for your Mac. Universal app for Apple silicon and Intel, macOS 14 Sonoma or later.
 
+### Fixed in 2.1
+
+- The lock-screen still no longer fills up your disk. Version 2.0 saved a new desktop picture every few minutes, and macOS keeps a large cached copy of every desktop picture it is given. Now there is one still per look (day, golden hour, night, dry or rainy), drawn once in clean conditions and reused, so it costs no extra disk space over time.
+- Nicer nights in every view: lights glow softly, moonlight brightens the scene, the night sky is deeper and clouds blend in, and the paper grain is lighter in the dark.
+
 ### Install
 
 1. Download **DhakaSky-*.dmg** below, open it and drag **Dhaka Sky** into **Applications**. (Or download the .zip and move the app to Applications.)

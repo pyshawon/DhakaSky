@@ -3,7 +3,7 @@
 # and installs it into ~/Applications. Pass --no-install to only build it (used by release.sh).
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION=${VERSION:-2.0}
+VERSION=${VERSION:-$(cat VERSION)}
 swift build -c release --arch arm64
 swift build -c release --arch x86_64
 ./build-saver.sh --no-install
@@ -32,7 +32,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>DhakaSky</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
-  <key>CFBundleVersion</key><string>2</string>
+  <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>

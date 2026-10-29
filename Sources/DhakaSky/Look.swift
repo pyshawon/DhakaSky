@@ -33,8 +33,8 @@ struct Look {
 
     // Clear-sky keyframes by solar elevation (degrees). Muted on purpose, easy on the eyes.
     private static let clearKeys: [(Double, Look)] = [
-        (-90, key(0x0A0F24, 0x141D3D, 0x26305A, 0x000000, 0.0, 0x3A4468, 0x242D4C, 0x19203B, 0x343C5E)),
-        (-16, key(0x0B1128, 0x172144, 0x2C3762, 0x2B2F5A, 0.0, 0x3C466C, 0x262F50, 0x1B223F, 0x383F62)),
+        (-90, key(0x070C22, 0x14204A, 0x2E3B6E, 0x000000, 0.0, 0x46557F, 0x26305A, 0x1A2244, 0x242E55)),
+        (-16, key(0x091029, 0x18244F, 0x34406F, 0x2B2F5A, 0.0, 0x485782, 0x28325C, 0x1C2446, 0x29335C)),
         (-9, key(0x121B44, 0x2A3470, 0x5A4E7E, 0x7A4F80, 0.25, 0x535A82, 0x383F68, 0x282E52, 0x5C5880)),
         (-4, key(0x1F2D66, 0x56528E, 0xC48A90, 0xE39A84, 0.55, 0x8C7590, 0x5C5583, 0x3C3962, 0xB08499)),
         (0.5, key(0x324E8A, 0x9E7DA6, 0xF0AC80, 0xFFB27A, 1.0, 0xD4A08E, 0x8A7896, 0x5D5275, 0xF2B48F)),
@@ -106,6 +106,9 @@ struct Look {
         o.hazeAlpha = 0.18 + w.haze * 0.35 + w.fog * 0.4
         o.fogAlpha = w.fog
         o.cityGlow = (1 - light) * (0.35 + grey * 0.5)
+
+        // Moonlight: a bright moon lifts the night foreground toward a cool silver-blue.
+        o.ambient = .mix(o.ambient, RGB(0x8E9CC8), o.moonAlpha * o.night * 0.22)
 
         o.waterFar = RGB.mix(o.hor, o.mid, 0.35).scaled(0.8)
         o.waterNear = RGB.mix(o.mid, o.top, 0.55).scaled(0.6)

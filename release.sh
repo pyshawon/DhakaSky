@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 export VERSION=${1:?usage: ./release.sh <version>}
+echo "$VERSION" > VERSION
 ./build-app.sh --no-install
 OUT=build/release; rm -rf "$OUT"; mkdir -p "$OUT/dmg"
 # Zip: the simplest download.

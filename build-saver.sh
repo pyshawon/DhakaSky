@@ -3,6 +3,7 @@
 # and installs it into ~/Library/Screen Savers (unless --no-install is given).
 set -euo pipefail
 cd "$(dirname "$0")"
+VERSION=${VERSION:-$(cat VERSION)}  # one version for the app and the saver; release.sh passes it in
 SRC=Sources/DhakaSky
 # The scene, art and weather code only; the app shell (menu, windows, sound, settings UI) stays out.
 FILES=()
@@ -33,8 +34,8 @@ cat > "$SAVER/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>Dhaka Sky</string>
   <key>CFBundleExecutable</key><string>DhakaSky</string>
   <key>CFBundlePackageType</key><string>BNDL</string>
-  <key>CFBundleShortVersionString</key><string>${VERSION:-2.0}</string>
-  <key>CFBundleVersion</key><string>2</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$VERSION</string>
   <key>NSPrincipalClass</key><string>DhakaSkySaverView</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
